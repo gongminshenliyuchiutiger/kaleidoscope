@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Kaleidoscope</title>
+  <!-- Font Awesome 6 CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- 3D WebGL Canvas Container -->
+  <div id="canvas-container" aria-label="3D Kaleidoscope Viewport"></div>
+
+  <!-- Hidden Video & Processing Canvases for Webcam & Motion Analysis -->
+  <video id="webcam-video" autoplay playsinline muted class="hidden-media"></video>
+  <canvas id="source-canvas" width="512" height="512" class="hidden-media"></canvas>
+  <canvas id="motion-canvas" width="64" height="64" class="hidden-media"></canvas>
+
+  <!-- Top Navigation / Header -->
+  <header class="top-header">
+    <div class="brand-group">
+      <div class="logo-badge">
+        <i class="fa-solid fa-gem fa-spin-pulse"></i>
+      </div>
+      <div class="title-wrap">
+        <h1 class="site-title">Kaleidoscope</h1>
+        <span class="site-subtitle"><i class="fa-solid fa-cubes"></i> 3D 互動視訊萬花筒實驗室</span>
+      </div>
+    </div>
+
+    <!-- Status Badges & Quick Actions -->
+    <div class="top-actions">
+      <div class="status-pills">
+        <span id="cam-status-pill" class="status-pill status-warn" title="攝影機狀態">
+          <i class="fa-solid fa-video-slash"></i> <span class="pill-text">動態模擬源</span>
+        </span>
+        <span id="motion-status-pill" class="status-pill" title="體感動作偵測能量">
+          <i class="fa-solid fa-hand-sparkles"></i> <span id="motion-meter-text">0%</span>
+        </span>
+        <span id="audio-status-pill" class="status-pill" title="麥克風音訊律動">
+          <i class="fa-solid fa-wave-square"></i> <span id="audio-meter-text">關閉</span>
+        </span>
+      </div>
+
+      <div class="action-buttons">
+        <button id="btn-start-cam" class="action-btn primary-glow" title="開啟或切換視訊鏡頭">
+          <i class="fa-solid fa-camera"></i> <span>開啟鏡頭</span>
+        </button>
+        <button id="btn-random" class="action-btn accent-glow" title="隨機產生奇幻組合 (空白鍵)">
+          <i class="fa-solid fa-shuffle"></i> <span>驚喜隨機</span>
+        </button>
+        <button id="btn-snapshot" class="action-btn studio-photo-btn" title="立即拍照 (快捷鍵 P)">
+          <i class="fa-solid fa-camera-retro"></i> <span>拍照</span>
+        </button>
+        <button id="btn-record" class="action-btn studio-video-btn" title="開始/停止錄影 (快捷鍵 R)">
+          <i class="fa-solid fa-video"></i> <span>錄影</span>
+        </button>
+        <div class="quality-select-wrap" title="選擇拍攝與錄影畫質及格式">
+          <i class="fa-solid fa-film"></i>
+          <select id="select-studio-preset" class="studio-select" aria-label="錄影格式與畫質">
+            <option value="mp4-ultra" selected>MP4 超高畫質</option>
+            <option value="mp4-high">MP4 高畫質</option>
+            <option value="mp4-std">MP4 標準</option>
+            <option value="webm-ultra">WebM 超高畫質</option>
+            <option value="webm-high">WebM 高畫質</option>
+          </select>
+        </div>
+        <button id="btn-open-gallery" class="action-btn" title="開啟拍攝作品相簿 (快捷鍵 G)">
+          <i class="fa-solid fa-images"></i> <span>相簿</span>
+          <span id="gallery-count-badge" class="count-badge">0</span>
+        </button>
+        <button id="btn-zen" class="action-btn" title="純享隱藏介面模式 (H)">
+          <i class="fa-solid fa-eye"></i>
+        </button>
+        <button id="btn-fullscreen" class="action-btn" title="切換全螢幕 (F)">
+          <i class="fa-solid fa-expand"></i>
+        </button>
+        <button id="btn-toggle-left" class="action-btn mobile-only" title="展開/收合訊號與主題面板">
+          <i class="fa-solid fa-wand-magic-sparkles"></i>
+        </button>
+        <button id="btn-toggle-panel" class="action-btn mobile-only" title="展開/收合參數控制面板">
+          <i class="fa-solid fa-sliders"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Screen Shutter Flash & Countdown Overlay -->
+  <div id="shutter-flash" class="shutter-flash"></div>
+  <div id="countdown-overlay" class="countdown-overlay hidden">
+    <span id="countdown-number">3</span>
+  </div>
+
+  <!-- Live Recording HUD Banner -->
+  <div id="recording-hud" class="recording-hud hidden">
+    <span class="rec-dot"><i class="fa-solid fa-circle"></i> REC</span>
+    <span id="rec-timer" class="rec-timer">00:00</span>
+    <button id="btn-pause-record" class="hud-mini-btn" title="暫停/繼續錄影">
+      <i class="fa-solid fa-pause"></i>
+    </button>
+    <button id="btn-stop-record-hud" class="hud-mini-btn stop" title="完成並儲存錄影">
+      <i class="fa-solid fa-stop"></i> 完成儲存
+    </button>
+  </div>
+
+  <!-- Photo & Video Gallery Modal -->
+  <div id="gallery-modal" class="gallery-modal hidden" role="dialog" aria-label="拍攝作品相簿">
+    <div class="gallery-dialog glass-card">
+      <div class="gallery-header">
+        <h3><i class="fa-solid fa-photo-film"></i> 萬花筒拍攝作品相簿</h3>
+        <div class="gallery-header-actions">
+          <button id="btn-clear-gallery" class="mini-action-btn danger-btn" title="清空全部紀錄">
+            <i class="fa-solid fa-trash-can"></i> 清空相簿
+          </button>
+          <button id="btn-close-gallery" class="icon-mini-btn" title="關閉相簿">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      </div>
+      <div id="gallery-grid" class="gallery-grid">
+        <div class="gallery-empty">
+          <i class="fa-solid fa-camera-retro"></i>
+          <p>尚無拍攝作品，點擊下方「拍照」或「錄影」捕捉奇幻瞬間！</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Restore UI Button when in Zen Mode -->
+  <button id="btn-exit-zen" class="exit-zen-btn hidden" title="顯示控制介面">
+    <i class="fa-solid fa-eye-slash"></i> 顯示控制面板
+  </button>
+
+  <!-- Left Quick Preset Dock & Webcam PiP Preview -->
+  <aside class="left-dock" id="left-dock">
+    <!-- Webcam Live Preview & Flexible Framing Card -->
+    <div class="glass-card pip-card">
+      <div class="card-header">
+        <span><i class="fa-solid fa-crop-simple"></i> 訊號預覽與彈性取景</span>
+        <div class="pip-mini-btns">
+          <button id="btn-switch-facing" class="icon-mini-btn" title="切換前後視訊鏡頭">
+            <i class="fa-solid fa-camera-rotate"></i>
+          </button>
+          <button id="btn-flip-cam" class="icon-mini-btn active" title="水平鏡像翻轉">
+            <i class="fa-solid fa-left-right"></i>
+          </button>
+          <button id="btn-freeze-cam" class="icon-mini-btn" title="凍結/解凍畫面">
+            <i class="fa-solid fa-snowflake"></i>
+          </button>
+          <button id="btn-reset-cam-frame" class="icon-mini-btn" title="重置鏡頭縮放與偏移回 1.0x 全畫面">
+            <i class="fa-solid fa-arrows-to-circle"></i>
+          </button>
+          <label for="upload-media-input" class="icon-mini-btn" title="上傳自訂圖片">
+            <i class="fa-solid fa-file-image"></i>
+          </label>
+          <input type="file" id="upload-media-input" accept="image/*" class="hidden-media" />
+        </div>
+      </div>
+      <div class="pip-preview-wrapper" id="pip-drag-area" title="可直接拖曳畫面移動取景位置、滾輪縮放大小！">
+        <canvas id="pip-canvas" width="200" height="150"></canvas>
+        <div class="pip-overlay-info">
+          <span id="source-label"><i class="fa-solid fa-wand-magic-sparkles"></i> 幻彩流體模擬</span>
+          <span id="cam-frame-badge" class="cam-frame-badge">1.0x 全廣角</span>
+        </div>
+      </div>
+      <!-- Camera Aspect / Framing Mode Bar -->
+      <div class="cam-aspect-bar">
+        <button class="aspect-btn active" data-camaspect="full" title="保留鏡頭完整廣角視野，不強制裁切放大">
+          <i class="fa-solid fa-expand"></i> 完整廣角
+        </button>
+        <button class="aspect-btn" data-camaspect="cover" title="等比例填滿萬花筒取樣區">
+          <i class="fa-solid fa-crop"></i> 等比滿版
+        </button>
+        <button class="aspect-btn" data-camaspect="focus" title="聚焦放大取景中心">
+          <i class="fa-solid fa-user-check"></i> 特寫聚焦
+        </button>
+      </div>
+      <!-- Quick Face Focus Mode Bar -->
+      <div class="face-quick-bar">
+        <button class="face-q-btn active" data-facemode="0" title="花瓣人像環：每片萬花筒花瓣都清晰映射你的臉">
+          <i class="fa-solid fa-sun"></i> 花瓣臉環
+        </button>
+        <button class="face-q-btn" data-facemode="1" title="中央魔鏡臉：畫面正中央直接呈現你的對稱五官">
+          <i class="fa-solid fa-face-grin-stars"></i> 中央魔鏡
+        </button>
+        <button class="face-q-btn" data-facemode="2" title="複眼人像陣：多格3D水晶複眼同時映出整張臉">
+          <i class="fa-solid fa-grip"></i> 複眼矩陣
+        </button>
+      </div>
+      <!-- Input Source Switcher -->
+      <div class="source-switcher">
+        <button class="src-btn active" data-source="webcam" title="視訊鏡頭">
+          <i class="fa-solid fa-video"></i> 鏡頭
+        </button>
+        <button class="src-btn" data-source="cyber" title="賽博星雲生成">
+          <i class="fa-solid fa-atom"></i> 星雲
+        </button>
+        <button class="src-btn" data-source="neonGrid" title="霓虹幾何矩陣">
+          <i class="fa-solid fa-border-all"></i> 矩陣
+        </button>
+        <button class="src-btn" data-source="aurora" title="極光流體">
+          <i class="fa-solid fa-water"></i> 流體
+        </button>
+      </div>
+    </div>
+
+    <!-- Quick Theme Presets -->
+    <div class="glass-card presets-card">
+      <div class="card-header">
+        <span><i class="fa-solid fa-star"></i> 主題風格預設</span>
+      </div>
+      <div class="preset-grid" id="preset-grid">
+        <button class="preset-chip active" data-preset="crystalPalace">
+          <i class="fa-solid fa-gem"></i> 鑽石星宮
+        </button>
+        <button class="preset-chip" data-preset="cyberTunnel">
+          <i class="fa-solid fa-circle-notch fa-spin"></i> 賽博深淵
+        </button>
+        <button class="preset-chip" data-preset="reliefSculpture">
+          <i class="fa-solid fa-mountain-sun"></i> 3D立體浮雕
+        </button>
+        <button class="preset-chip" data-preset="sacredMandala">
+          <i class="fa-solid fa-dharmachakra"></i> 黃金曼陀羅
+        </button>
+        <button class="preset-chip" data-preset="quantumVortex">
+          <i class="fa-solid fa-hurricane"></i> 量子星系渦流
+        </button>
+        <button class="preset-chip" data-preset="prismMatrix">
+          <i class="fa-solid fa-cubes-stacked"></i> 稜鏡魔方陣
+        </button>
+        <button class="preset-chip" data-preset="thermalDream">
+          <i class="fa-solid fa-fire-flame-curved"></i> 熱感烈焰
+        </button>
+        <button class="preset-chip" data-preset="hyperGlass">
+          <i class="fa-solid fa-snowflake"></i> 極地冰晶
+        </button>
+      </div>
+    </div>
+
+    <!-- Interactive Hints -->
+    <div class="glass-card tips-card">
+      <div class="card-header">
+        <span><i class="fa-solid fa-hand-pointer"></i> 互動操作指南</span>
+      </div>
+      <ul class="tips-list">
+        <li><i class="fa-solid fa-arrows-up-down-left-right"></i> <strong>拖曳畫面：</strong>360° 旋轉 3D 視角與光軸</li>
+        <li><i class="fa-solid fa-magnifying-glass-plus"></i> <strong>滾輪縮放：</strong>推進或拉遠 3D 隧道景深</li>
+        <li><i class="fa-solid fa-bolt"></i> <strong>點擊畫面：</strong>釋放 3D 能量重力波紋</li>
+        <li><i class="fa-solid fa-hands-clapping"></i> <strong>揮動雙手：</strong>鏡頭前揮手加速萬花筒旋轉</li>
+      </ul>
+    </div>
+  </aside>
+
+  <!-- Right Control Panel (Multi-Tab Comprehensive Controls) -->
+  <aside class="right-panel" id="right-panel">
+    <div class="panel-tabs">
+      <button class="tab-btn active" data-tab="tab-3d">
+        <i class="fa-solid fa-cube"></i> 3D 空間
+      </button>
+      <button class="tab-btn" data-tab="tab-kaleido">
+        <i class="fa-solid fa-snowflake"></i> 鏡像結構
+      </button>
+      <button class="tab-btn" data-tab="tab-color">
+        <i class="fa-solid fa-palette"></i> 色彩濾鏡
+      </button>
+      <button class="tab-btn" data-tab="tab-sensor">
+        <i class="fa-solid fa-satellite-dish"></i> 感應互動
+      </button>
+    </div>
+
+    <!-- TAB 1: 3D Geometry & Space -->
+    <div class="tab-content active" id="tab-3d">
+      <div class="control-section">
+        <label class="section-label"><i class="fa-solid fa-shapes"></i> 3D 幾何載體模式</label>
+        <div class="geometry-selector" id="geometry-selector">
+          <button class="geo-btn active" data-geo="dome">
+            <i class="fa-solid fa-globe"></i>
+            <span>全境穹頂</span>
+          </button>
+          <button class="geo-btn" data-geo="tunnel">
+            <i class="fa-solid fa-bullseye"></i>
+            <span>無限隧道</span>
+          </button>
+          <button class="geo-btn" data-geo="crystal">
+            <i class="fa-solid fa-gem"></i>
+            <span>多面鑽石</span>
+          </button>
+          <button class="geo-btn" data-geo="relief">
+            <i class="fa-solid fa-layer-group"></i>
+            <span>3D視訊浮雕</span>
+          </button>
+          <button class="geo-btn" data-geo="torus">
+            <i class="fa-solid fa-ring"></i>
+            <span>莫比烏斯環</span>
+          </button>
+          <button class="geo-btn" data-geo="prismCluster">
+            <i class="fa-solid fa-cubes"></i>
+            <span>魔方星群</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <div class="slider-header">
+          <span><i class="fa-solid fa-mountain"></i> 3D 立體浮雕深度</span>
+          <span class="val-badge" id="val-extrusion">1.2</span>
+        </div>
+        <input type="range" id="ctrl-extrusion" min="0" max="3.5" step="0.05" value="1.2" />
+      </div>
+
+      <div class="control-group">
+        <div class="slider-header">
+          <span><i class="fa-solid fa-arrows-to-eye"></i> 空間景深與視野 (FOV)</span>
+          <span class="val-badge" id="val-zoom">1.0</span>
+        </div>
+        <input type="range" id="ctrl-zoom" min="0.3" max="2.5" step="0.05" value="1.0" />
+      </div>
+
+      <div class="control-group">
+        <div class="slider-header">
+          <span><i class="fa-solid fa-compass-drafting"></i> 3D 傾角擺動幅度</span>
+          <span class="val-badge" id="val-tilt">0.45</span>
+        </div>
+        <input type="range" id="ctrl-tilt" min="0" max="1.5" step="0.05" value="0.45" />
+      </div>
+
+      <div class="toggle-row">
+        <label class="toggle-item">
+          <input type="checkbox" id="chk-wireframe" />
+          <span class="toggle-Icon"><i class="fa-solid fa-border-none"></i> 疊加 3D 霓虹線框</span>
+        </label>
+        <label class="toggle-item">
+          <input type="checkbox" id="chk-particles" checked />
+          <span class="toggle-Icon"><i class="fa-solid fa-wand-sparkles"></i> 3D 懸浮星塵粒子</span>
+        </label>
+        <label class="toggle-item">
+          <input type="checkbox" id="chk-autorotate3d" checked />
+          <span class="toggle-Icon"><i class="fa-solid fa-rotate"></i> 3D 空間自動巡航</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- TAB 2: Kaleidoscope Symmetry & Structure -->
+    <div class="tab-content" id="tab-kaleido">
+      <div class="control-section">
+        <label class="section-label"><i class="fa-solid fa-face-smile-wink"></i> 鏡頭人像對稱排列模式</label>
+        <div class="geometry-selector" id="face-mode-selector">
+          <button class="geo-btn active" data-facemode="0" title="每片花瓣中心都完整呈現你的臉孔">
+            <i class="fa-solid fa-sun"></i>
+            <span>花瓣人像環</span>
+          </button>
+          <button class="geo-btn" data-facemode="1" title="正中央直接對稱映射你的臉部五官">
+            <i class="fa-solid fa-masks-theater"></i>
+            <span>中央魔鏡臉</span>
+          </button>
+          <button class="geo-btn" data-facemode="2" title="六角蜂巢複眼矩陣，每格都是清晰人像">
+            <i class="fa-solid fa-braille"></i>
+            <span>複眼人像陣</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <div class="slider-header">
+          <span><i class="fa-solid fa-magnifying-glass"></i> 鏡頭取景縮放 (Cam Zoom)</span>
+          <span class="val-badge" id="val-facezoom">1.0x</span>
+        </div>
+        <input type="range" id="ctrl-facezoom" min="0.5" max="3.0" step="0.05" value="1.0" />
+      </div>
+
+      <div class="dual-slider-row">
+        <div class="control-group">
+          <div class="slider-header">
+            <span><i class="fa-solid fa-arrows-left-right"></i> 鏡頭水平偏移</span>
+            <span class="val-badge" id="val-campanx">0%</span>
+          </div>
+          <input type="range" id="ctrl-campanx" min="-100" max="100" step="2" value="0" />
+        </div>
+        <div class="control-group">
+          <div class="slider-header">
+            <span><i class="fa-solid fa-arrows-up-down"></i> 鏡頭垂直偏移</span>
+            <span class="val-badge" id="val-campany">0%</span>
+          </div>
+          <input type="range" id="ctrl-campany" min="-100" max="100" step="2" value="0" />
+        </div>
+      </div>
+
+      <div class="control-group">
+        <div class="slider-header">
+          <span><i class="fa-solid fa-chart-pie"></i> 對稱鏡像瓣數 (Segments)</span>
+          <span class="val-badge" id="val-segments">8</span>
+        </div>
+        <input type="range" id="ctrl-segments" min="2" max="36" step="2" value="8" />
+      </div>
+
+      <div class="control-group">
+        <div class="slider-header">
+          <span><i class="fa-solid fa-clone"></i> 畫面取樣範圍 (Scale)</span>
+          <span class="val-badge" id="val-repeat">1.1</span>
+        </div>
+        <input type="range" id="ctrl-repeat" min="0.4" max="4.0" step="0.05" value="1.1" />
+      </div>
+
+      <div class="control-group">
+        <div class="slider-header">
+          <span><i class="fa-solid fa-hurricane"></i> 螺旋扭曲強度 (Spiral Twist)</span>
+          <span class="val-badge" id="val-twist">0.00</span>
+        </div>
+        <input type="range" id="ctrl-twist" min="-2.5" max="2.5" step="0.05" value="0.00" />
+      </div>
+
+      <div class="control-group">
+        <div class="slider-header">
+          <span><i class="fa-solid fa-dharmachakra"></i> 內圈多重折疊 (Recursive Fold)</span>
+          <span class="val-badge" id="val-fold">1</span>
+        </div>
+        <input type="range" id="ctrl-fold" min="1" max="5" step="1" value="1" />
+      </div>
+
+      <div class="control-group">
+        <div class="slider-header">
+          <span><i class="fa-solid fa-gauge-high"></i> 萬花筒旋轉速度</span>
+          <span class="val-badge" id="val-speed">0.35</span>
+        </div>
+        <input type="range" id="ctrl-speed" min="-3.0" max="3.0" step="0.05" value="0.35" />
+      </div>
+
+      <div class="control-group">
+        <div class="slider-header">
+          <span><i class="fa-solid fa-water"></i> 徑向波紋律動 (Radial Pulse)</span>
+          <span class="val-badge" id="val-pulse">0.08</span>
+        </div>
+        <input type="range" id="ctrl-pulse" min="0" max="1.5" step="0.02" value="0.08" />
+      </div>
+    </div>
+
+    <!-- TAB 3: Color & Filter Effects -->
+    <div class="tab-content" id="tab-color">
+      <div class="control-section">
+        <label class="section-label"><i class="fa-solid fa-wand-magic-sparkles"></i> 光學濾鏡模式</label>
+        <div class="filter-selector" id="filter-selector">
+          <button class="filter-btn active" data-filter="0">
+            <i class="fa-solid fa-image"></i> 原始鮮明
+          </button>
+          <button class="filter-btn" data-filter="1">
+            <i class="fa-solid fa-bolt-lightning"></i> 霓虹賽博
+          </button>
+          <button class="filter-btn" data-filter="2">
+            <i class="fa-solid fa-rainbow"></i> 迷幻光譜
+          </button>
+          <button class="filter-btn" data-filter="3">
+            <i class="fa-solid fa-crown"></i> 琉璃黑金
+          </button>
+          <button class="filter-btn" data-filter="4">
+            <i class="fa-solid fa-fire"></i> 熱成像儀
+          </button>
+          <button class="filter-btn" data-filter="5">
+            <i class="fa-solid fa-vector-square"></i> 螢光邊緣
+          </button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <div class="slider-header">
+          <span><i class="fa-solid fa-swatchbook"></i> 色相旋轉偏移 (Hue Shift)</span>
+          <span class="val-badge" id="val-hue">0°</span>
+        </div>
+        <input type="range" id="ctrl-hue" min="0" max="360" step="1" value="0" />
+      </div>
+
+      <div class="control-group">
+        <div class="slider-header">
+          <span><i class="fa-solid fa-droplet"></i> 色彩飽和度 (Saturation)</span>
+          <span class="val-badge" id="val-saturation">1.3</span>
+        </div>
+        <input type="range" id="ctrl-saturation" min="0" max="3.0" step="0.05" value="1.3" />
+      </div>
+
+      <div class="control-group">
+        <div class="slider-header">
+          <span><i class="fa-solid fa-sun"></i> 霓虹輝光強度 (Bloom & Contrast)</span>
+          <span class="val-badge" id="val-glow">1.15</span>
+        </div>
+        <input type="range" id="ctrl-glow" min="0.5" max="2.5" step="0.05" value="1.15" />
+      </div>
+
+      <div class="control-group">
+        <div class="slider-header">
+          <span><i class="fa-solid fa-circle-half-stroke"></i> 暗角與稜鏡色散 (Chromatic Aberration)</span>
+          <span class="val-badge" id="val-aberration">0.25</span>
+        </div>
+        <input type="range" id="ctrl-aberration" min="0" max="1.5" step="0.05" value="0.25" />
+      </div>
+
+      <div class="toggle-row">
+        <label class="toggle-item">
+          <input type="checkbox" id="chk-autohue" />
+          <span class="toggle-Icon"><i class="fa-solid fa-infinity"></i> 彩虹光譜自動流轉</span>
+        </label>
+        <label class="toggle-item">
+          <input type="checkbox" id="chk-invert" />
+          <span class="toggle-Icon"><i class="fa-solid fa-yin-yang"></i> 負片反轉色調</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- TAB 4: Interactive Sensors & Audio/Motion -->
+    <div class="tab-content" id="tab-sensor">
+      <div class="sensor-card">
+        <div class="sensor-header">
+          <span><i class="fa-solid fa-hands-asl-interpreting"></i> 視訊體感動作互動</span>
+          <label class="switch-pill">
+            <input type="checkbox" id="chk-motion-react" checked />
+            <span class="slider-round"></span>
+          </label>
+        </div>
+        <p class="sensor-desc">在鏡頭前揮動手部或身體，動作能量會即時加速萬花筒旋轉並激發 3D 立體突起！</p>
+        <div class="meter-bar-bg">
+          <div id="motion-bar-fill" class="meter-bar-fill"></div>
+        </div>
+      </div>
+
+      <div class="sensor-card">
+        <div class="sensor-header">
+          <span><i class="fa-solid fa-microphone-lines"></i> 麥克風音訊聲波律動</span>
+          <button id="btn-toggle-audio" class="mini-action-btn">
+            <i class="fa-solid fa-microphone"></i> 啟用音訊
+          </button>
+        </div>
+        <p class="sensor-desc">開啟後對著麥克風說話、拍手或播放音樂，重低音與高頻將驅動萬花筒縮放與色彩閃耀。</p>
+        <div class="meter-bar-bg">
+          <div id="audio-bar-fill" class="meter-bar-fill audio-fill"></div>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <div class="slider-header">
+          <span><i class="fa-solid fa-bolt"></i> 感應靈敏度倍率</span>
+          <span class="val-badge" id="val-sensitivity">1.5</span>
+        </div>
+        <input type="range" id="ctrl-sensitivity" min="0.2" max="4.0" step="0.1" value="1.5" />
+      </div>
+
+      <div class="toggle-row">
+        <label class="toggle-item">
+          <input type="checkbox" id="chk-automorph" />
+          <span class="toggle-Icon"><i class="fa-solid fa-wand-magic"></i> 參數自動呼吸演化</span>
+        </label>
+        <label class="toggle-item">
+          <input type="checkbox" id="chk-watermark" checked />
+          <span class="toggle-Icon"><i class="fa-solid fa-copyright"></i> 拍攝加上精緻版權浮水印</span>
+        </label>
+      </div>
+
+      <div class="sensor-card studio-config-card">
+        <div class="sensor-header">
+          <span><i class="fa-solid fa-sliders"></i> 拍照倒數與錄影限時</span>
+        </div>
+        <div class="studio-mini-row">
+          <button id="btn-timer-cycle" class="mini-action-btn" title="切換拍照倒數秒數">
+            <i class="fa-solid fa-stopwatch"></i> <span id="timer-label">快門：立即</span>
+          </button>
+          <button id="btn-rec-limit-cycle" class="mini-action-btn" title="切換錄影自動停止秒數">
+            <i class="fa-solid fa-hourglass-half"></i> <span id="rec-limit-label">錄影：不限時</span>
+          </button>
+        </div>
+      </div>
+
+      <button id="btn-reset-all" class="reset-btn">
+        <i class="fa-solid fa-rotate-left"></i> 重置所有參數回預設值
+      </button>
+    </div>
+  </aside>
+
+  <!-- Draggable Mascot (Bottom-Left Default, Neon Rainbow Glow & Shake on Hover) -->
+  <div id="mascot-widget" class="mascot-container" title="點我按住可拖曳到任何地方！懸停發光抖動">
+    <div class="mascot-badge">
+      <i class="fa-solid fa-arrows-up-down-left-right"></i>
+    </div>
+    <img src="image/LiyuChillGuy.svg" alt="LiyuChillGuy 吉祥物" class="mascot-img" draggable="false" />
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast-msg" class="toast-msg" role="status" aria-live="polite">
+    <i class="fa-solid fa-circle-info"></i> <span id="toast-text">準備就緒</span>
+  </div>
+
+  <!-- Bottom Footer -->
+  <footer class="site-footer">
+    <a href="https://www.facebook.com/happyliyuchilltiger/" target="_blank" rel="noopener noreferrer" class="fb-page-link" title="前往快樂鯉魚秋老虎 Facebook 粉絲專頁">
+      <i class="fa-brands fa-facebook"></i>
+      <span>快樂鯉魚秋老虎</span>
+    </a>
+    <div class="copyright-text">
+      Copyright © Liyuchiutiger Gongminshen
+    </div>
+  </footer>
+
+  <!-- Three.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="script.js"></script>
+</body>
+</html>
